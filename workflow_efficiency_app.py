@@ -381,7 +381,7 @@ def plot_performance_ratios(result, title_suffix=""):
         color = colors[i % len(colors)]
         
         fig.add_trace(go.Scatter(
-            x=entity_data["period_sort"],
+            x=entity_data["period_label"],
             y=entity_data["performance_ratio_pct"],
             mode="lines+markers",
             name=entity,
@@ -389,13 +389,13 @@ def plot_performance_ratios(result, title_suffix=""):
             marker=dict(color=color, size=8),
             hovertemplate=(
                 "<b>%{fullData.name}</b><br>"
-                "Period: %{customdata[0]}<br>"
+                "Period: %{x}<br>"
                 "Rs: %{y:.1f}%<br>"
-                "Units: %{customdata[1]:,.0f}<br>"
-                "Workflows: %{customdata[2]}"
+                "Units: %{customdata[0]:,.0f}<br>"
+                "Workflows: %{customdata[1]}"
                 "<extra></extra>"
             ),
-            customdata=entity_data[["period_label", "total_units", "num_workflows"]].values,
+            customdata=entity_data[["total_units", "num_workflows"]].values,
         ))
     
     # Expected line
@@ -432,11 +432,12 @@ def plot_performance_ratios(result, title_suffix=""):
         margin=dict(b=120),
     )
     
-    # Map period_sort back to period_label for x-axis
-    period_mapping = dict(zip(result["period_sort"], result["period_label"]))
+    # Use categorical x-axis to keep weeks consecutive
     fig.update_xaxes(
-        tickvals=sorted(result["period_sort"].unique()),
-        ticktext=[period_mapping[p] for p in sorted(result["period_sort"].unique())],
+        type='category',
+        categoryorder='array',
+        categoryarray=sorted(result["period_label"].unique(), 
+                           key=lambda x: result[result["period_label"]==x]["period_sort"].iloc[0]),
         tickangle=-45
     )
     
@@ -457,20 +458,20 @@ def plot_unit_volume(result, title_suffix=""):
         color = colors[i % len(colors)]
         
         fig.add_trace(go.Bar(
-            x=entity_data["period_sort"],
+            x=entity_data["period_label"],
             y=entity_data["total_units"],
             name=entity,
             marker_color=color,
             opacity=0.8,
             hovertemplate=(
                 "<b>%{fullData.name}</b><br>"
-                "Period: %{customdata[0]}<br>"
+                "Period: %{x}<br>"
                 "Units: %{y:,.0f}<br>"
-                "Rs: %{customdata[1]:.1f}%<br>"
-                "Workflows: %{customdata[2]}"
+                "Rs: %{customdata[0]:.1f}%<br>"
+                "Workflows: %{customdata[1]}"
                 "<extra></extra>"
             ),
-            customdata=entity_data[["period_label", "performance_ratio_pct", "num_workflows"]].values,
+            customdata=entity_data[["performance_ratio_pct", "num_workflows"]].values,
         ))
     
     title = "Weekly Task Volume"
@@ -496,11 +497,12 @@ def plot_unit_volume(result, title_suffix=""):
         margin=dict(b=120),
     )
     
-    # Map period_sort back to period_label for x-axis
-    period_mapping = dict(zip(result["period_sort"], result["period_label"]))
+    # Use categorical x-axis to keep weeks consecutive
     fig.update_xaxes(
-        tickvals=sorted(result["period_sort"].unique()),
-        ticktext=[period_mapping[p] for p in sorted(result["period_sort"].unique())],
+        type='category',
+        categoryorder='array',
+        categoryarray=sorted(result["period_label"].unique(), 
+                           key=lambda x: result[result["period_label"]==x]["period_sort"].iloc[0]),
         tickangle=-45
     )
     
@@ -526,7 +528,7 @@ def plot_comparison(result_1, result_2, selected_entities_1, selected_entities_2
         color = colors_1[i % len(colors_1)]
         
         fig.add_trace(go.Scatter(
-            x=entity_data["period_sort"],
+            x=entity_data["period_label"],
             y=entity_data["performance_ratio_pct"],
             mode="lines+markers",
             name=f"{entity} ({agg_level_1_label})",
@@ -536,13 +538,13 @@ def plot_comparison(result_1, result_2, selected_entities_1, selected_entities_2
             legendgrouptitle_text=f"Group 1 – {agg_level_1_label}",
             hovertemplate=(
                 "<b>%{fullData.name}</b><br>"
-                "Period: %{customdata[0]}<br>"
+                "Period: %{x}<br>"
                 "Rs: %{y:.1f}%<br>"
-                "Units: %{customdata[1]:,.0f}<br>"
-                "Workflows: %{customdata[2]}"
+                "Units: %{customdata[0]:,.0f}<br>"
+                "Workflows: %{customdata[1]}"
                 "<extra></extra>"
             ),
-            customdata=entity_data[["period_label", "total_units", "num_workflows"]].values,
+            customdata=entity_data[["total_units", "num_workflows"]].values,
         ))
     
     # Plot Group 2
@@ -553,7 +555,7 @@ def plot_comparison(result_1, result_2, selected_entities_1, selected_entities_2
         color = colors_2[i % len(colors_2)]
         
         fig.add_trace(go.Scatter(
-            x=entity_data["period_sort"],
+            x=entity_data["period_label"],
             y=entity_data["performance_ratio_pct"],
             mode="lines+markers",
             name=f"{entity} ({agg_level_2_label})",
@@ -563,13 +565,13 @@ def plot_comparison(result_1, result_2, selected_entities_1, selected_entities_2
             legendgrouptitle_text=f"Group 2 – {agg_level_2_label}",
             hovertemplate=(
                 "<b>%{fullData.name}</b><br>"
-                "Period: %{customdata[0]}<br>"
+                "Period: %{x}<br>"
                 "Rs: %{y:.1f}%<br>"
-                "Units: %{customdata[1]:,.0f}<br>"
-                "Workflows: %{customdata[2]}"
+                "Units: %{customdata[0]:,.0f}<br>"
+                "Workflows: %{customdata[1]}"
                 "<extra></extra>"
             ),
-            customdata=entity_data[["period_label", "total_units", "num_workflows"]].values,
+            customdata=entity_data[["total_units", "num_workflows"]].values,
         ))
     
     # Expected line
@@ -604,11 +606,12 @@ def plot_comparison(result_1, result_2, selected_entities_1, selected_entities_2
         margin=dict(b=160),
     )
     
-    # Map period_sort back to period_label for x-axis
-    period_mapping = dict(zip(all_results["period_sort"], all_results["period_label"]))
+    # Use categorical x-axis to keep weeks consecutive
     fig.update_xaxes(
-        tickvals=sorted(all_results["period_sort"].unique()),
-        ticktext=[period_mapping[p] for p in sorted(all_results["period_sort"].unique())],
+        type='category',
+        categoryorder='array',
+        categoryarray=sorted(all_results["period_label"].unique(), 
+                           key=lambda x: all_results[all_results["period_label"]==x]["period_sort"].iloc[0]),
         tickangle=-45
     )
     
@@ -691,7 +694,7 @@ def main():
         )
     
     if data_file is None:
-        st.info("🤔 Upload your data CSV to get started")
+        st.info("👋 Upload your data CSV to get started")
         with st.expander("📋 Expected CSV Format", expanded=False):
             st.markdown("""
             **Required columns:**
@@ -725,7 +728,7 @@ def main():
     # MODE SWITCH
     # ========================================================================
     
-    st.markdown("### 🔀 Analysis Mode")
+    st.markdown("### 🎯 Analysis Mode")
     
     analysis_mode = st.radio(
         "Select aggregation type:",
@@ -739,7 +742,8 @@ def main():
     st.markdown("---")
     
     # Build sorted week list once (used by both tabs)
-    all_weeks_sorted = sorted(df_full["period_label"].unique())
+    all_weeks_sorted = sorted(df_full["period_label"].unique(), 
+                             key=lambda x: df_full[df_full["period_label"]==x]["period_sort"].iloc[0])
     
     # Tabs for Basic vs Advanced mode
     tab1, tab2 = st.tabs(["📊 Basic Analysis", "🔬 Advanced Comparison"])
@@ -1014,7 +1018,7 @@ def main():
             with col_dl1:
                 csv1 = result.to_csv(index=False)
                 st.download_button(
-                    "📥 Performance Ratios CSV",
+                    "💾 Performance Ratios CSV",
                     csv1,
                     "performance_ratios.csv",
                     "text/csv",
@@ -1023,7 +1027,7 @@ def main():
             with col_dl2:
                 csv2 = detail.to_csv(index=False)
                 st.download_button(
-                    "📥 Workflow Detail CSV",
+                    "💾 Workflow Detail CSV",
                     csv2,
                     "workflow_detail.csv",
                     "text/csv",
@@ -1364,7 +1368,7 @@ def main():
             
             csv_combined = result_combined.to_csv(index=False)
             st.download_button(
-                "📥 Download Comparison Results",
+                "💾 Download Comparison Results",
                 csv_combined,
                 "cross_level_comparison.csv",
                 "text/csv",
