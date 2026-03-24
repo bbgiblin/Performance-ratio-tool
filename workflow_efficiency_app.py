@@ -377,11 +377,11 @@ def validate_data_quality(df):
     
     if (df['aht_median'] <= 0).any():
         count = (df['aht_median'] <= 0).sum()
-        issues.append(("warning", f"⚠️ {count:,} rows with invalid AHT (≤0) — these will be filtered"))
+        issues.append(("warning", f"⚠️ {count:,} rows with invalid AHT (≤0) → these will be filtered"))
     
     if (df['processed_units'] <= 0).any():
         count = (df['processed_units'] <= 0).sum()
-        issues.append(("warning", f"⚠️ {count:,} rows with invalid volume (≤0) — these will be filtered"))
+        issues.append(("warning", f"⚠️ {count:,} rows with invalid volume (≤0) → these will be filtered"))
     
     weeks = df['period_sort'].nunique() if 'period_sort' in df.columns else 0
     stats['weeks'] = weeks
@@ -405,11 +405,6 @@ def validate_data_quality(df):
         incomplete_sites = site_weeks[site_weeks < weeks * 0.5].index.tolist()
         if incomplete_sites:
             issues.append(("warning", f"⚠️ {len(incomplete_sites)} site(s) with <50% week coverage: {', '.join(incomplete_sites[:3])}{'...' if len(incomplete_sites) > 3 else ''}"))
-    
-    if 'workflow_key' in df.columns and 'site' in df.columns and 'period_sort' in df.columns:
-        duplicates = df.duplicated(subset=['workflow_key', 'site', 'period_sort']).sum()
-        if duplicates > 0:
-            issues.append(("warning", f"⚠️ {duplicates:,} duplicate records detected (same workflow+site+period)"))
     
     workflow_counts = df['workflow_key'].value_counts() if 'workflow_key' in df.columns else pd.Series()
     stats['workflows'] = len(workflow_counts)
