@@ -22,6 +22,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+def main():
+    st.title("🎯 Workflow Efficiency Index Tool")
+
 # ---------------------------------------------------------------------------
 # COLUMN MAPPING & REGION DEFINITIONS
 # ---------------------------------------------------------------------------
@@ -1564,7 +1567,15 @@ def main():
             st.image("peccy.png", width=120)
         except:
             pass
-        
+
+        st.markdown("""
+        <div style='font-size: 0.85em; color: #666; padding: 10px 0; border-bottom: 1px solid #ddd; margin-bottom: 15px;'>
+        <strong>Tool Creator:</strong><br>
+        Benjamin Giblin (bgiblin@)<br>
+        AGI-DS Quality Team<br>
+        CBG10
+        </div>
+        """, unsafe_allow_html=True)
         st.markdown("## ⚙️ Configuration")
         st.markdown("---")
         
