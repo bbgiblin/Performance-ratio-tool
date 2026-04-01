@@ -208,7 +208,7 @@ def render_hierarchy_selector(df, agg_level, is_work_type_mode, key_prefix="basi
             with col_select:
                 if use_all:
                     selected_parents = available_values
-                    st.caption(f"✅ All {len(available_values)} {parent_label}(s)")
+                    st.caption(f"✓ All {len(available_values)} {parent_label}(s)")
                 else:
                     selected_parents = st.multiselect(
                         f"Select {parent_label}:",
@@ -236,7 +236,7 @@ def render_hierarchy_selector(df, agg_level, is_work_type_mode, key_prefix="basi
     ])
     
     if len(all_entities) < len(total_entities):
-        st.caption(f"📋 Showing **{len(all_entities)}** of {len(total_entities)} {labels.get(agg_level, agg_level)}(s) based on hierarchy filter")
+        st.caption(f"🔍 Showing **{len(all_entities)}** of {len(total_entities)} {labels.get(agg_level, agg_level)}(s) based on hierarchy filter")
     
     col_all, col_none = st.columns(2)
     with col_all:
@@ -441,7 +441,7 @@ def validate_data_quality(df):
 
 
 def display_data_quality_report(issues, stats):
-    st.markdown("### 🔍 Data Quality Report")
+    st.markdown("### 📊 Data Quality Report")
     
     errors = [msg for severity, msg in issues if severity == "error"]
     warnings = [msg for severity, msg in issues if severity == "warning"]
@@ -661,7 +661,7 @@ def generate_insights(result, df_full, quality_enabled):
     else:
         insights.append({
             'type': 'info',
-            'message': f"✅ Network performing near target (**{avg_rs:.1f}%**)"
+            'message': f"✓ Network performing near target (**{avg_rs:.1f}%**)"
         })
     
     entity_volatility = result.groupby('entity')['performance_ratio_pct'].std()
@@ -1210,7 +1210,7 @@ def plot_performance_ratios(result, title_suffix=""):
         annotation_font_color="#E53935",
     )
 
-    title = "Workflow Efficiency Index — Performance Over Time"
+    title = "Workflow Efficiency Index – Performance Over Time"
     if title_suffix:
         title += f" ({title_suffix})"
 
@@ -1330,7 +1330,7 @@ def plot_comparison(result_1, result_2, selected_entities_1, selected_entities_2
             line=dict(color=color, width=2.5),
             marker=dict(color=color, size=8, symbol="circle"),
             legendgroup="group1",
-            legendgrouptitle_text=f"Group 1 — {agg_level_1_label}",
+            legendgrouptitle_text=f"Group 1 – {agg_level_1_label}",
             hovertemplate=(
                 "<b>%{fullData.name}</b><br>"
                 "Period: %{x}<br>"
@@ -1356,7 +1356,7 @@ def plot_comparison(result_1, result_2, selected_entities_1, selected_entities_2
             line=dict(color=color, width=2, dash="dash"),
             marker=dict(color=color, size=7, symbol="square"),
             legendgroup="group2",
-            legendgrouptitle_text=f"Group 2 — {agg_level_2_label}",
+            legendgrouptitle_text=f"Group 2 – {agg_level_2_label}",
             hovertemplate=(
                 "<b>%{fullData.name}</b><br>"
                 "Period: %{x}<br>"
@@ -1416,7 +1416,7 @@ def plot_comparison(result_1, result_2, selected_entities_1, selected_entities_2
 
 def show_explanation_section():
     """Display a comprehensive explanation of all tool sections and terminology."""
-    st.markdown("## 📖 Explanation of Sections & Terminology")
+    st.markdown("## 📚 Explanation of Sections & Terminology")
     st.markdown("---")
 
     st.markdown("### 🔢 Core Formula")
@@ -1425,11 +1425,11 @@ def show_explanation_section():
 
     | Symbol | Meaning |
     |--------|---------|
-    | **Rs** | Performance Ratio — the final efficiency score for an entity in a given period |
-    | **Ew** | Expected AHT — the target average handle time for a workflow (from uploaded goals or computed network average) |
-    | **Aw,s** | Actual AHT — the observed average handle time for a workflow performed by entity *s* |
-    | **Qw,s** | Quality Coefficient — an optional multiplier derived from audit pass rates vs. quality goals |
-    | **Pw,s** | Volume Proportion — the share of total units that a particular workflow represents for entity *s* in that period |
+    | **Rs** | Performance Ratio – the final efficiency score for an entity in a given period |
+    | **Ew** | Expected AHT – the target average handle time for a workflow (from uploaded goals or computed network average) |
+    | **Aw,s** | Actual AHT – the observed average handle time for a workflow performed by entity *s* |
+    | **Qw,s** | Quality Coefficient – an optional multiplier derived from audit pass rates vs. quality goals |
+    | **Pw,s** | Volume Proportion – the share of total units that a particular workflow represents for entity *s* in that period |
 
     A score of **100%** means the entity is performing exactly at the expected level.
     Scores **above 100%** indicate faster-than-expected processing (higher efficiency).
@@ -1437,7 +1437,7 @@ def show_explanation_section():
     """)
 
     st.markdown("---")
-    st.markdown("### 📂 Data Sources (Sidebar)")
+    st.markdown("### 📁 Data Sources (Sidebar)")
     st.markdown("""
     | Upload | Purpose |
     |--------|---------|
@@ -1454,23 +1454,23 @@ def show_explanation_section():
     | Setting | Description |
     |---------|-------------|
     | **Enable Quality Coefficient** | Toggles whether quality data adjusts the Rs score. When off, Qw,s = 1.0 for all rows. |
-    | **Minimum Audit Threshold** | *≥1 audit*: apply the coefficient whenever any audit exists. *≥6 audits*: require at least 6 audited tasks before applying — rows below the threshold default to Qw,s = 1.0. |
+    | **Minimum Audit Threshold** | *≥1 audit*: apply the coefficient whenever any audit exists. *≥6 audits*: require at least 6 audited tasks before applying – rows below the threshold default to Qw,s = 1.0. |
     | **Sensitivity (k)** | Controls how aggressively quality deviations affect the score. The coefficient is calculated as *(actual quality / goal quality)^k*. Higher k amplifies both bonuses and penalties. |
     """)
 
     st.markdown("---")
-    st.markdown("### 🔍 Data Quality Report")
+    st.markdown("### 📊 Data Quality Report")
     st.markdown("""
     Automatically generated when data is loaded. Checks include:
 
-    - **Missing columns** — verifies all required fields are present.
-    - **Invalid values** — flags rows with AHT ≤ 0 or volume ≤ 0.
-    - **Time coverage** — reports how many weeks of data are available.
-    - **AHT outliers** — identifies extreme values that may skew results.
-    - **Site completeness** — warns if any site has data for less than half the available weeks.
-    - **Duplicate records** — detects repeated workflow+site+period combinations.
-    - **Low-volume workflows** — notes workflows with very few data points.
-    - **Missing hierarchy data** — reports high missing rates in optional columns (managers, demand category, etc.).
+    - **Missing columns** – verifies all required fields are present.
+    - **Invalid values** – flags rows with AHT ≤ 0 or volume ≤ 0.
+    - **Time coverage** – reports how many weeks of data are available.
+    - **AHT outliers** – identifies extreme values that may skew results.
+    - **Site completeness** – warns if any site has data for less than half the available weeks.
+    - **Duplicate records** – detects repeated workflow+site+period combinations.
+    - **Low-volume workflows** – notes workflows with very few data points.
+    - **Missing hierarchy data** – reports high missing rates in optional columns (managers, demand category, etc.).
     """)
 
     st.markdown("---")
@@ -1496,7 +1496,7 @@ def show_explanation_section():
     | Setting | Description |
     |---------|-------------|
     | **Analysis Mode** | *Employee Groups*: aggregate by Region → Site → Ops Manager → Team Manager → Data Associate. *Work Type*: aggregate by Demand Category → Customer → Workflow → Workflow+Locale. |
-    | **Group by** | Selects the aggregation level — each entity at this level gets its own Rs% line. |
+    | **Group by** | Selects the aggregation level – each entity at this level gets its own Rs% line. |
     | **Hierarchy Filter** | When viewing granular levels, parent-level dropdowns appear so you can narrow the entity list (e.g., pick a Region first, then see only Sites within it). |
     | **Baseline Scope** | *Network*: expected AHT is computed from the entire dataset. *Relative*: expected AHT is computed only from the selected entities' data. |
     | **Baseline Calculation** | *Weighted Mean*: volume-weighted average AHT per workflow (high-volume periods count more). *Median*: simple median AHT per workflow (resistant to outliers). |
@@ -1536,12 +1536,12 @@ def show_explanation_section():
     |---------|-------------|
     | **Group 1 / Group 2** | Each group has its own aggregation level selector and entity picker with hierarchy filtering. |
     | **Shared Settings** | Baseline scope, calculation method, week filter, and workflow/site filter apply to both groups. |
-    | **Comparison Chart** | Overlays both groups on a single chart — Group 1 as solid lines, Group 2 as dashed lines. |
+    | **Comparison Chart** | Overlays both groups on a single chart – Group 1 as solid lines, Group 2 as dashed lines. |
     | **Comparison Summary** | Table combining both groups' latest-period results for direct comparison. |
     """)
 
     st.markdown("---")
-    st.markdown("### 📥 Downloads")
+    st.markdown("### 💾 Downloads")
     st.markdown("""
     | Download | Contents |
     |----------|----------|
@@ -1556,7 +1556,7 @@ def show_explanation_section():
 # ---------------------------------------------------------------------------
 
 def main():
-    st.title("📊 Workflow Efficiency Index Tool")
+    st.title("🎯 Workflow Efficiency Index Tool")
     
     # ---------------------------------------------------------------------------
     # SIDEBAR
@@ -1580,19 +1580,35 @@ def main():
         st.markdown("---")
         
         with st.expander("📁 Data Sources", expanded=True):
-            data_file = st.file_uploader(
-                "**Data CSV** (Required)",
-                type=["csv"],
+            # Data CSV with hyperlink
+            st.markdown(
+                "**[Data CSV](https://us-east-1.quicksight.aws.amazon.com/sn/account/ads-quicksight-de/dashboards/4ee31a3c-0a67-4d34-9fc4-75ab3b1a88df_dashboard_id)** (Required)",
+                unsafe_allow_html=True
             )
+            data_file = st.file_uploader(
+                "Upload Data CSV",
+                type=["csv"],
+                key="data_csv_uploader",
+                label_visibility="collapsed"
+            )
+            
+            st.markdown("---")
             
             expected_file = st.file_uploader(
                 "**Expected AHT CSV** (Optional)",
                 type=["csv"],
             )
             
+            # Quality CSV with hyperlink
+            st.markdown(
+                "**[Quality CSV](https://us-east-1.quicksight.aws.amazon.com/sn/account/ads-quicksight-de/dashboards/7f34b9a0-7844-4177-9bec-1b4f7bee5b6d_dashboard_id)** (Optional)",
+                unsafe_allow_html=True
+            )
             quality_file = st.file_uploader(
-                "**Quality CSV** (Optional)",
+                "Upload Quality CSV",
                 type=["csv"],
+                key="quality_csv_uploader",
+                label_visibility="collapsed"
             )
         
         if quality_file:
@@ -1624,13 +1640,13 @@ def main():
         
         st.markdown("---")
         st.caption("v2.2")
-    
+
     # ---------------------------------------------------------------------------
     # MAIN CONTENT AREA
     # ---------------------------------------------------------------------------
     
     if data_file is None:
-        st.info("📁 Upload your data CSV in the sidebar to get started")
+        st.info("📤 Upload your data CSV in the sidebar to get started")
         
         # Show explanation section when no data is loaded
         show_explanation_section()
@@ -1641,7 +1657,7 @@ def main():
         df_full = load_and_clean_data(data_file)
     
     # Data Quality Report
-    with st.expander("🔍 Data Quality Report", expanded=True):
+    with st.expander("📊 Data Quality Report", expanded=True):
         issues, stats = validate_data_quality(df_full)
         display_data_quality_report(issues, stats)
     
@@ -1701,7 +1717,7 @@ def main():
                              key=lambda x: df_full[df_full["period_label"]==x]["period_sort"].iloc[0])
     
     # Tabs
-    tab1, tab2, tab3 = st.tabs(["📈 Dashboard", "🔬 Advanced Comparison", "📖 Explanation"])
+    tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🔬 Advanced Comparison", "📚 Explanation"])
     
     # ========================================================================
     # TAB 1: DASHBOARD
