@@ -40,7 +40,7 @@ COLUMN_MAPPING = {
     "Column-5:Team Manager": "team_manager",
     "Column-6:DA": "da_name",
     "Column-7:Demand Category": "demand_category",
-    "Column-8:Customer": "customer",
+    "Processed Hours": "processed_hours",
 }
 
 REGION_MAPPING = {
@@ -264,7 +264,7 @@ def render_hierarchy_selector(df, agg_level, is_work_type_mode, key_prefix="basi
     st.session_state[prev_selection_key] = selected_entities
     
     if parent_selections and selected_entities:
-        with st.expander("📊 Selection Summary", expanded=False):
+        with st.expander("📋 Selection Summary", expanded=False):
             for parent_level, parent_values in parent_selections.items():
                 parent_label = labels.get(parent_level, parent_level)
                 if len(parent_values) <= 5:
@@ -380,11 +380,11 @@ def validate_data_quality(df):
     
     if (df['aht_median'] <= 0).any():
         count = (df['aht_median'] <= 0).sum()
-        issues.append(("warning", f"⚠️ {count:,} rows with invalid AHT (≤0) → these will be filtered"))
+        issues.append(("warning", f"⚠️ {count:,} rows with invalid AHT (≤0) – these will be filtered"))
     
     if (df['processed_units'] <= 0).any():
         count = (df['processed_units'] <= 0).sum()
-        issues.append(("warning", f"⚠️ {count:,} rows with invalid volume (≤0) → these will be filtered"))
+        issues.append(("warning", f"⚠️ {count:,} rows with invalid volume (≤0) – these will be filtered"))
     
     weeks = df['period_sort'].nunique() if 'period_sort' in df.columns else 0
     stats['weeks'] = weeks
@@ -542,33 +542,31 @@ def show_executive_summary(df_full, result, quality_enabled=False):
         latest_result = result[result['period_sort'] == latest_period].copy()
         
         if not latest_result.empty:
-            # Define fixed order: Excellent first (top), then Above Target, Below Target, Needs Attention last
             CATEGORY_ORDER = [
-                "🟢 Excellent (≥110%)",
-                "✅ Above Target (100-110%)",
-                "⚠️ Below Target (90-100%)",
-                "🔴 Needs Attention (<90%)",
+                "🟢 Excellent (>125%)",
+                "✅ Above Target (100-125%)",
+                "⚠️ Below Target (85-100%)",
+                "🔴 Needs Attention (<85%)",
             ]
             CATEGORY_COLORS = {
-                "🟢 Excellent (≥110%)":       "#4CAF50",   # green
-                "✅ Above Target (100-110%)":  "#8BC34A",   # pale green
-                "⚠️ Below Target (90-100%)":   "#FFC107",   # yellow
-                "🔴 Needs Attention (<90%)":   "#F44336",   # red
+                "🟢 Excellent (>125%)":       "#4CAF50",
+                "✅ Above Target (100-125%)":  "#8BC34A",
+                "⚠️ Below Target (85-100%)":   "#FFC107",
+                "🔴 Needs Attention (<85%)":   "#F44336",
             }
 
             def categorize_performance(rs):
-                if rs >= 110:
-                    return "🟢 Excellent (≥110%)"
+                if rs > 130:
+                    return "🟢 Excellent (>125%)"
                 elif rs >= 100:
-                    return "✅ Above Target (100-110%)"
-                elif rs >= 90:
-                    return "⚠️ Below Target (90-100%)"
+                    return "✅ Above Target (100-125%)"
+                elif rs >= 80:
+                    return "⚠️ Below Target (85-100%)"
                 else:
-                    return "🔴 Needs Attention (<90%)"
+                    return "🔴 Needs Attention (<85%)"
             
             latest_result['category'] = latest_result['performance_ratio_pct'].apply(categorize_performance)
             
-            # Build counts in the fixed order, keeping only categories that exist
             ordered_labels = []
             ordered_values = []
             ordered_colors = []
@@ -585,12 +583,12 @@ def show_executive_summary(df_full, result, quality_enabled=False):
                 values=ordered_values,
                 hole=0.4,
                 marker=dict(colors=ordered_colors),
-                sort=False,           # preserve the explicit order
-                direction='clockwise' # Excellent starts at top, goes clockwise
+                sort=False,
+                direction='clockwise'
             )])
             fig.update_layout(
                 showlegend=True,
-                legend=dict(traceorder='normal'),  # keep legend in the same order
+                legend=dict(traceorder='normal'),
                 height=300,
                 margin=dict(l=20, r=20, t=20, b=20)
             )
@@ -748,6 +746,11 @@ def load_and_clean_data(uploaded_file):
 
     df["aht_median"] = pd.to_numeric(df["aht_median"], errors="coerce")
     df["processed_units"] = pd.to_numeric(df["processed_units"], errors="coerce")
+    if "processed_hours" in df.columns:
+        df["processed_hours"] = pd.to_numeric(df["processed_hours"], errors="coerce")
+        df["processed_hours"] = df["processed_hours"].fillna(0)
+    else:
+        df["processed_hours"] = 0
     df = df.dropna(subset=["aht_median", "processed_units"])
     df = df[df["processed_units"] > 0].copy()
     df = df[df["aht_median"] > 0].copy()
@@ -864,6 +867,58 @@ def compute_default_expected_aht(df, use_median=False):
 
     expected.columns = ["workflow_key", "expected_aht"]
     return expected
+
+
+@st.cache_data
+def compute_rolling_expected_aht(df, use_median=False, weeks_before=4, weeks_after=1):
+    """
+    Compute expected AHT using a rolling window for each week.
+    For each week, uses data from N weeks before and M weeks after (when available).
+    
+    Args:
+        df: DataFrame with workflow data
+        use_median: If True, use median; otherwise use weighted mean
+        weeks_before: Number of weeks before to include (default 4)
+        weeks_after: Number of weeks after to include (default 1)
+    
+    Returns:
+        DataFrame with workflow_key, period_sort, and expected_aht
+    """
+    all_periods = sorted(df['period_sort'].unique())
+    results = []
+    
+    for target_period in all_periods:
+        period_idx = all_periods.index(target_period)
+        
+        start_idx = max(0, period_idx - weeks_before)
+        end_idx = min(len(all_periods), period_idx + weeks_after + 1)
+        
+        window_periods = all_periods[start_idx:end_idx]
+        
+        window_df = df[df['period_sort'].isin(window_periods)].copy()
+        
+        if use_median:
+            expected = (
+                window_df.groupby("workflow_key")["aht_median"]
+                .median()
+                .reset_index()
+            )
+        else:
+            def weighted_mean(group):
+                return np.average(group["aht_median"], weights=group["processed_units"])
+            
+            expected = (
+                window_df.groupby("workflow_key")
+                .apply(weighted_mean, include_groups=False)
+                .reset_index()
+            )
+        
+        expected.columns = ["workflow_key", "expected_aht"]
+        expected['period_sort'] = target_period
+        results.append(expected)
+    
+    final_df = pd.concat(results, ignore_index=True)
+    return final_df
 
 
 # ---------------------------------------------------------------------------
@@ -1010,9 +1065,24 @@ def week_range_selector(all_weeks_sorted, key_prefix):
 def calculate_performance_ratios(
     df, expected_aht_df, agg_level,
     use_hybrid=True, full_df_for_defaults=None, use_median=False,
-    quality_coefficients=None,
+    quality_coefficients=None, use_rolling_window=False,
+    weighting_method="units", 
 ):
-    if use_hybrid:
+    if use_rolling_window:
+        if full_df_for_defaults is not None:
+            rolling_expected = compute_rolling_expected_aht(full_df_for_defaults, use_median)
+        else:
+            rolling_expected = compute_rolling_expected_aht(df, use_median)
+        
+        merged = df.merge(rolling_expected, on=["workflow_key", "period_sort"], how="left")
+        
+        if use_hybrid and not expected_aht_df.empty:
+            merged = merged.merge(expected_aht_df, on="workflow_key", how="left", suffixes=("", "_goal"))
+            merged["expected_aht"] = merged["expected_aht_goal"].fillna(merged["expected_aht"])
+            if "expected_aht_goal" in merged.columns:
+                merged = merged.drop(columns=["expected_aht_goal"])
+    
+    elif use_hybrid:
         if full_df_for_defaults is not None:
             default_expected = compute_default_expected_aht(full_df_for_defaults, use_median)
         else:
@@ -1054,7 +1124,23 @@ def calculate_performance_ratios(
     else:
         merged["quality_coeff"] = 1.0
 
+    weight_col = "processed_hours" if weighting_method == "hours" else "processed_units"
+
+    # If weighting by hours, ensure the column exists and filter out zero/null
+    if weight_col == "processed_hours":
+        if weight_col not in merged.columns:
+            merged["processed_hours"] = 0
+        merged = merged[merged[weight_col] > 0].copy()
+
     group_period_totals = (
+        merged.groupby([group_col, "period_sort"])[weight_col]
+        .sum()
+        .reset_index()
+        .rename(columns={weight_col: "total_weight"})
+    )
+
+    # Keep total_units for display regardless of weighting method
+    group_period_units = (
         merged.groupby([group_col, "period_sort"])["processed_units"]
         .sum()
         .reset_index()
@@ -1062,7 +1148,8 @@ def calculate_performance_ratios(
     )
 
     merged = merged.merge(group_period_totals, on=[group_col, "period_sort"])
-    merged["pw_s"] = merged["processed_units"] / merged["total_units"]
+    merged = merged.merge(group_period_units, on=[group_col, "period_sort"])
+    merged["pw_s"] = merged[weight_col] / merged["total_weight"]
     merged["rs_contribution"] = (
         (merged["expected_aht"] / merged["aht_median"])
         * merged["quality_coeff"]
@@ -1074,6 +1161,7 @@ def calculate_performance_ratios(
         .agg(
             performance_ratio=("rs_contribution", "sum"),
             total_units=("total_units", "first"),
+            total_weight=("total_weight", "first"),
             num_workflows=("workflow_key", "nunique"),
             avg_quality_coeff=("quality_coeff", "mean"),
         )
@@ -1089,9 +1177,24 @@ def calculate_performance_ratios(
 def calculate_workflow_detail(
     df, expected_aht_df, agg_level,
     use_hybrid=True, full_df_for_defaults=None, use_median=False,
-    quality_coefficients=None,
+    quality_coefficients=None, use_rolling_window=False,
+    weighting_method="units", 
 ):
-    if use_hybrid:
+    if use_rolling_window:
+        if full_df_for_defaults is not None:
+            rolling_expected = compute_rolling_expected_aht(full_df_for_defaults, use_median)
+        else:
+            rolling_expected = compute_rolling_expected_aht(df, use_median)
+        
+        merged = df.merge(rolling_expected, on=["workflow_key", "period_sort"], how="left")
+        
+        if use_hybrid and not expected_aht_df.empty:
+            merged = merged.merge(expected_aht_df, on="workflow_key", how="left", suffixes=("", "_goal"))
+            merged["expected_aht"] = merged["expected_aht_goal"].fillna(merged["expected_aht"])
+            if "expected_aht_goal" in merged.columns:
+                merged = merged.drop(columns=["expected_aht_goal"])
+    
+    elif use_hybrid:
         if full_df_for_defaults is not None:
             default_expected = compute_default_expected_aht(full_df_for_defaults, use_median)
         else:
@@ -1133,7 +1236,21 @@ def calculate_workflow_detail(
     else:
         merged["quality_coeff"] = 1.0
 
+    weight_col = "processed_hours" if weighting_method == "hours" else "processed_units"
+
+    if weight_col == "processed_hours":
+        if weight_col not in merged.columns:
+            merged["processed_hours"] = 0
+        merged = merged[merged[weight_col] > 0].copy()
+
     group_period_totals = (
+        merged.groupby([group_col, "period_sort"])[weight_col]
+        .sum()
+        .reset_index()
+        .rename(columns={weight_col: "total_weight"})
+    )
+
+    group_period_units = (
         merged.groupby([group_col, "period_sort"])["processed_units"]
         .sum()
         .reset_index()
@@ -1141,7 +1258,8 @@ def calculate_workflow_detail(
     )
 
     merged = merged.merge(group_period_totals, on=[group_col, "period_sort"])
-    merged["pw_s"] = merged["processed_units"] / merged["total_units"]
+    merged = merged.merge(group_period_units, on=[group_col, "period_sort"])
+    merged["pw_s"] = merged[weight_col] / merged["total_weight"]
     merged["efficiency"] = merged["expected_aht"] / merged["aht_median"]
     merged["rs_contribution"] = merged["efficiency"] * merged["quality_coeff"] * merged["pw_s"]
     merged = merged.rename(columns={group_col: "entity"})
@@ -1429,7 +1547,7 @@ def show_explanation_section():
     | **Ew** | Expected AHT – the target average handle time for a workflow (from uploaded goals or computed network average) |
     | **Aw,s** | Actual AHT – the observed average handle time for a workflow performed by entity *s* |
     | **Qw,s** | Quality Coefficient – an optional multiplier derived from audit pass rates vs. quality goals |
-    | **Pw,s** | Volume Proportion – the share of total units that a particular workflow represents for entity *s* in that period |
+    | **Pw,s** | Hours Proportion – the share of total processed hours that a particular workflow represents for entity *s* in that period |
 
     A score of **100%** means the entity is performing exactly at the expected level.
     Scores **above 100%** indicate faster-than-expected processing (higher efficiency).
@@ -1499,7 +1617,7 @@ def show_explanation_section():
     | **Group by** | Selects the aggregation level – each entity at this level gets its own Rs% line. |
     | **Hierarchy Filter** | When viewing granular levels, parent-level dropdowns appear so you can narrow the entity list (e.g., pick a Region first, then see only Sites within it). |
     | **Baseline Scope** | *Network*: expected AHT is computed from the entire dataset. *Relative*: expected AHT is computed only from the selected entities' data. |
-    | **Baseline Calculation** | *Weighted Mean*: volume-weighted average AHT per workflow (high-volume periods count more). *Median*: simple median AHT per workflow (resistant to outliers). |
+    | **Baseline Calculation** | *Weighted Mean*: volume-weighted average AHT per workflow (high-volume periods count more). *Median*: simple median AHT per workflow (resistant to outliers). *Rolling Window*: uses 4 weeks before + 1 week after for each period's expected AHT. |
     | **Week Filter** | Restrict the analysis to a specific range of weeks. |
     | **Workflow / Site Filter** | Limit which workflows (in Employee mode) or sites (in Work Type mode) are included in the calculation. |
     """)
@@ -1580,7 +1698,6 @@ def main():
         st.markdown("---")
         
         with st.expander("📁 Data Sources", expanded=True):
-            # Data CSV with hyperlink
             st.markdown(
                 "**[Data CSV](https://us-east-1.quicksight.aws.amazon.com/sn/account/ads-quicksight-de/dashboards/4ee31a3c-0a67-4d34-9fc4-75ab3b1a88df_dashboard_id)** (Required)",
                 unsafe_allow_html=True
@@ -1599,7 +1716,6 @@ def main():
                 type=["csv"],
             )
             
-            # Quality CSV with hyperlink
             st.markdown(
                 "**[Quality CSV](https://us-east-1.quicksight.aws.amazon.com/sn/account/ads-quicksight-de/dashboards/7f34b9a0-7844-4177-9bec-1b4f7bee5b6d_dashboard_id)** (Optional)",
                 unsafe_allow_html=True
@@ -1639,24 +1755,20 @@ def main():
             sensitivity_k = 3.0
         
         st.markdown("---")
-        st.caption("v2.2")
+        st.caption("v2.3 - Rolling Window Support")
 
     # ---------------------------------------------------------------------------
     # MAIN CONTENT AREA
     # ---------------------------------------------------------------------------
     
     if data_file is None:
-        st.info("📤 Upload your data CSV in the sidebar to get started")
-        
-        # Show explanation section when no data is loaded
+        st.info("🤔 Upload your data CSV in the sidebar to get started")
         show_explanation_section()
         return
     
-    # Load data
     with st.spinner("Loading and validating data..."):
         df_full = load_and_clean_data(data_file)
     
-    # Data Quality Report
     with st.expander("📊 Data Quality Report", expanded=True):
         issues, stats = validate_data_quality(df_full)
         display_data_quality_report(issues, stats)
@@ -1668,14 +1780,12 @@ def main():
     
     st.success(f"✅ Loaded {len(df_full):,} rows | {df_full['period_sort'].nunique()} weeks | {df_full['workflow_key'].nunique()} workflows")
     
-    # Load expected AHT
     if expected_file:
         expected_aht_df = load_expected_aht(expected_file)
         st.success(f"✅ Loaded {len(expected_aht_df)} workflow goals")
     else:
         expected_aht_df = pd.DataFrame(columns=["workflow_key", "expected_aht"])
     
-    # Load quality data
     quality_df = None
     if quality_file:
         with st.spinner("Loading quality data..."):
@@ -1686,7 +1796,6 @@ def main():
     
     st.markdown("---")
     
-    # Quality coefficients cache
     quality_coefficients_cache = {}
     
     def get_quality_coefficients(agg_level):
@@ -1701,7 +1810,6 @@ def main():
             )
         return quality_coefficients_cache[cache_key]
     
-    # Mode selection
     analysis_mode = st.radio(
         "Select aggregation type:",
         options=["👥 Employee Groups", "📦 Work Type"],
@@ -1712,11 +1820,9 @@ def main():
     
     st.markdown("---")
     
-    # Build sorted week list
     all_weeks_sorted = sorted(df_full["period_label"].unique(),
                              key=lambda x: df_full[df_full["period_label"]==x]["period_sort"].iloc[0])
     
-    # Tabs
     tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🔬 Advanced Comparison", "📚 Explanation"])
     
     # ========================================================================
@@ -1769,6 +1875,14 @@ def main():
                 key="basic_calc_method"
             )
             use_median = (baseline_calc == "Median")
+            
+            use_rolling_window = st.checkbox(
+                "Use rolling window for expected AHT",
+                value=False,
+                help="Calculate expected AHT using 4 weeks before + 1 week after for each period"
+            )
+            
+            weighting_method = "hours"
             
             st.markdown("---")
             st.markdown("**Week Filter**")
@@ -1875,10 +1989,14 @@ def main():
             result = calculate_performance_ratios(
                 df_display, expected_aht_df, agg_level, use_hybrid, baseline_df, use_median,
                 quality_coefficients=qc,
+                use_rolling_window=use_rolling_window,
+                weighting_method=weighting_method,
             )
             detail = calculate_workflow_detail(
                 df_display, expected_aht_df, agg_level, use_hybrid, baseline_df, use_median,
                 quality_coefficients=qc,
+                use_rolling_window=use_rolling_window,
+                weighting_method=weighting_method,
             )
             
             if result.empty:
@@ -2017,6 +2135,15 @@ def main():
                 key="adv_calc_method"
             )
             use_median_adv = (baseline_calc_adv == "Median")
+            
+            use_rolling_window_adv = st.checkbox(
+                "Rolling window",
+                value=False,
+                help="Use 4 weeks before + 1 week after",
+                key="adv_rolling"
+            )
+            
+            weighting_method_adv = "hours"
         
         with col_set3:
             st.markdown("**Week Filter**")
@@ -2127,6 +2254,8 @@ def main():
             result_1 = calculate_performance_ratios(
                 df_display_1, expected_aht_df, agg_level_1, True, baseline_df_1, use_median_adv,
                 quality_coefficients=qc_1,
+                use_rolling_window=use_rolling_window_adv,
+                weighting_method=weighting_method_adv,
             )
             
             if agg_level_2 == "network":
@@ -2152,6 +2281,8 @@ def main():
             result_2 = calculate_performance_ratios(
                 df_display_2, expected_aht_df, agg_level_2, True, baseline_df_2, use_median_adv,
                 quality_coefficients=qc_2,
+                use_rolling_window=use_rolling_window_adv,
+                weighting_method=weighting_method_adv,
             )
             
             if result_1.empty or result_2.empty:
