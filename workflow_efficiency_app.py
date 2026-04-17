@@ -2250,14 +2250,7 @@ def main():
                     df_filtered_1 = df_filtered_1[df_filtered_1["workflow_key"].isin(selected_workflows_adv)].copy()
                     df_display_1 = df_display_1[df_display_1["workflow_key"].isin(selected_workflows_adv)].copy()
             
-            baseline_df_1 = df_full if use_full_dataset_adv else df_filtered_1
-            result_1 = calculate_performance_ratios(
-                df_display_1, expected_aht_df, agg_level_1, True, baseline_df_1, use_median_adv,
-                quality_coefficients=qc_1,
-                use_rolling_window=use_rolling_window_adv,
-                weighting_method=weighting_method_adv,
-            )
-            
+            # --- Build filtered/display DataFrames for Group 2 ---
             if agg_level_2 == "network":
                 df_filtered_2 = df_full.copy()
             else:
@@ -2277,9 +2270,23 @@ def main():
                     df_filtered_2 = df_filtered_2[df_filtered_2["workflow_key"].isin(selected_workflows_adv)].copy()
                     df_display_2 = df_display_2[df_display_2["workflow_key"].isin(selected_workflows_adv)].copy()
             
-            baseline_df_2 = df_full if use_full_dataset_adv else df_filtered_2
+            # --- Shared baseline: union of both groups' data (deduplicated) ---
+            if use_full_dataset_adv:
+                shared_baseline_df = df_full
+            else:
+                shared_baseline_df = pd.concat(
+                    [df_display_1, df_display_2]
+                ).drop_duplicates()
+            
+            result_1 = calculate_performance_ratios(
+                df_display_1, expected_aht_df, agg_level_1, True, shared_baseline_df, use_median_adv,
+                quality_coefficients=qc_1,
+                use_rolling_window=use_rolling_window_adv,
+                weighting_method=weighting_method_adv,
+            )
+            
             result_2 = calculate_performance_ratios(
-                df_display_2, expected_aht_df, agg_level_2, True, baseline_df_2, use_median_adv,
+                df_display_2, expected_aht_df, agg_level_2, True, shared_baseline_df, use_median_adv,
                 quality_coefficients=qc_2,
                 use_rolling_window=use_rolling_window_adv,
                 weighting_method=weighting_method_adv,
